@@ -231,11 +231,11 @@ function certCheck($cert,$uid){
 				$grad = certCheckNid(22686,$uid);
 				break;
 			case "HDS":		
-                $grad1 = certCheckNid(22594,$uid);	
-                $grad2 = certCheckNid(22686,$uid);
-                if ( ($grad1)&&($grad2) ){
-                    $grad=1;
-                }
+		                $grad1 = certCheckNid(22594,$uid);	
+		                $grad2 = certCheckNid(22686,$uid);
+		                if ( ($grad1)&&($grad2) ){
+		                    $grad=1;
+		                }
 				break;
 			
 			// IN DEPTH			
@@ -333,10 +333,10 @@ function hvcb_user($op, &$edit, &$account, $category = NULL){
 			<user_DESTINATIONS_SELL>{$user->profile_what_destinations_do_you_sell}</user_DESTINATIONS_SELL>   
 			<user_CONSORTIA_AGENCYGROUP>{$user->profile_do_you_belong_to_a_group}</user_CONSORTIA_AGENCYGROUP>
 			<user_PREF_WHOLESALERS>{$user->profile_preferred_wholesalers}</user_PREF_WHOLESALERS>
-            <user_NICHE_CATEGORIES>{$user->profile_do_you_sell_niche_categories}</user_NICHE_CATEGORIES>
-            <user_BOOK_LARGE_GROUPS>{$user->profile_do_you_sell_to_large_groups}</user_BOOK_LARGE_GROUPS>
-            <user_AVG_CLIENTS_SENT>{$user->profile_how_many_clients_do_you_send_to_hawaii_each_year}</user_AVG_CLIENTS_SENT>
-            <user_BOOKED_REVENUE>{$user->profile_annual_revenue}</user_BOOKED_REVENUE>
+        		<user_NICHE_CATEGORIES>{$user->profile_do_you_sell_niche_categories}</user_NICHE_CATEGORIES>
+            		<user_BOOK_LARGE_GROUPS>{$user->profile_do_you_sell_to_large_groups}</user_BOOK_LARGE_GROUPS>
+            		<user_AVG_CLIENTS_SENT>{$user->profile_how_many_clients_do_you_send_to_hawaii_each_year}</user_AVG_CLIENTS_SENT>
+            		<user_BOOKED_REVENUE>{$user->profile_annual_revenue}</user_BOOKED_REVENUE>
 		</Emails>
 		</xml>]]>";
 
