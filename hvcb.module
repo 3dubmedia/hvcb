@@ -185,7 +185,6 @@ function certCheck($cert,$uid){
 	$userInfo="";
 	$grad=0;
 	
-	global $user;
 	if ( is_numeric($uid) ){
 		$userInfo = user_load($uid);
 	}
