@@ -1,0 +1,382 @@
+<?php
+
+/* Workshop
+ *
+ * We allow users to enter a workshop code to bypass content
+ * When user enters an access code, we pass it to URL :workhop/<code>
+ *
+ * Callaback function does a look up to see if the access code is bound to a Course content type
+ * If so, the node is loaded and user gets redirected to the course page
+ * If not, the user is redirected to an error page
+ * 
+ */
+
+function hvcb_menu(){
+	$items['workshop/%'] = array(
+	'title' => 'workshop code',
+	'page callback' => 'workshop_code',
+	'page arguments' => array(1),
+	'access arguments' => array('access content'),
+	'type' => MENU_CALLBACK,
+	);
+	
+	return $items;
+}
+
+function workshop_code($code) { 
+    $code = htmlspecialchars($code);
+
+    $field = content_fields('field_codes');
+    $db_info = content_database_info($field);
+    $result = db_query("SELECT node.nid AS nid FROM node node  
+        LEFT JOIN content_type_course node_data_field_codes
+        ON node.vid = node_data_field_codes.vid 
+        WHERE (node.status = 1) 
+        AND (node.type in ('course')) 
+        AND (node_data_field_codes.field_codes_value LIKE '%{$code}%')");
+
+    if ($result) {
+        while($row = mysql_fetch_array($result)) {
+            $nid = $row['nid'];
+        }
+
+    }
+
+    if ($nid){
+        $node = node_load($nid);
+        $path =$node->path;
+        drupal_goto($path);
+    } else {
+        drupal_goto('workshop-error');
+    }
+    
+}
+
+/*
+ *  Imports
+ *
+ *	We are importing content types from several different sources.
+ *	There is a cron running every night to fetch data and store it in csv files
+ *
+ *	Run cron to use the Feeds module to import this data
+ */
+
+function hvcb_cron() {
+	$file='events.csv';
+	$myFeed = feeds_source('node');
+	$config = array('FeedsFileFetcher'=>array('source'=>'sites/default/files/imports/' . $file));
+	$myFeed->addConfig($config);
+	while (FEEDS_BATCH_COMPLETE != $myFeed->import());
+	
+	$file2='activities.csv';
+	$myFeed2 = feeds_source('activities');
+	$config2 = array('FeedsFileFetcher'=>array('source'=>'sites/default/files/imports/' . $file2));
+	$myFeed2->addConfig($config2);
+	while (FEEDS_BATCH_COMPLETE != $myFeed2->import());
+}
+
+
+
+/*
+ * QUIZ FUNCTION - gradDate
+ * 
+ * this is used to get graduate date from imported users only
+ */
+
+function gradDate($user,$quiz){
+    $result = db_query('SELECT date FROM {graduation_dates} WHERE user = "%s" AND quiz = "%s"', $user, $quiz);
+    while ($row = db_fetch_object($result)) {
+         $date = $row->date;
+    }
+    return $date;
+}
+
+/*
+ * QUIZ FUNCTION - hdsDate
+ * 
+ * This is used to get hds date from imported users only
+ */
+
+function hdsDate($user){
+    $result = db_query('SELECT date FROM {hds_dates} WHERE user = "%s"', $user);
+    while ($row = db_fetch_object($result)) {
+         $date = $row->date;
+    }
+    return $date;
+}
+
+/*
+ * QUIZ FUNCTION - quizAPI
+ * 
+ * This function is called when we need to pass data to the client's CRM
+ * 
+ */
+
+function quizAPI($uid,$nid,$pass){
+
+    $node = node_load($nid);
+    $apikey=$node->field_api_key[0]['value'];
+    
+    if ($pass){
+        $status="Pass";
+    } else {
+        $status="Fail";
+    }
+    $quiz = "<{$apikey}>{$status}</{$apikey}>";
+    $user = user_load($uid);
+
+    $xml="<![CDATA[<xml>
+    <Emails>
+    <EmailAddress>".$user->mail."</EmailAddress>
+    <FirstName>".$user->profile_first_name."</FirstName>
+    <LastName>".$user->profile_last_name."</LastName>
+    {$quiz}
+    </Emails>
+    </xml>]]>";
+
+	$url="http://webservices.ecn5.com/ListManager.asmx?op=AddSubscriberUsingSmartForm";
+	
+	$soapString='<?xml version="1.0" encoding="utf-8"?>
+	<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+	  <soap:Body>
+		<AddSubscriberUsingSmartForm xmlns="http://webservices.ecn5.com/">
+		  <ecnAccessKey>07380a30-ec29-40b0-b6d7-685d32d35eab</ecnAccessKey>
+		  <listID>248316</listID>
+		  <subscriptionType>S</subscriptionType>
+		  <formatType>HTML</formatType>
+		  <xmlString>'.$xml.'</xmlString>
+		  <SFID>2297</SFID>
+		</AddSubscriberUsingSmartForm>
+	  </soap:Body>
+	</soap:Envelope>';
+	
+	$headers = array(
+		"Content-type: text/xml;charset=\"utf-8\"",
+		"Accept: text/xml",
+		"Cache-Control: no-cache",
+		"Pragma: no-cache",
+		"SOAPAction: http://webservices.ecn5.com/AddSubscriberUsingSmartForm", 
+		"Content-length: ".strlen($soapString),
+	); 
+	
+	$soap_do = curl_init(); 
+	curl_setopt($soap_do, CURLOPT_URL,            $url );   
+	curl_setopt($soap_do, CURLOPT_CONNECTTIMEOUT, 300); 
+	curl_setopt($soap_do, CURLOPT_TIMEOUT,        300); 
+	curl_setopt($soap_do, CURLOPT_RETURNTRANSFER, true );
+	curl_setopt($soap_do, CURLOPT_SSL_VERIFYPEER, false);  
+	curl_setopt($soap_do, CURLOPT_SSL_VERIFYHOST, false); 
+	curl_setopt($soap_do, CURLOPT_POST,           true ); 
+	curl_setopt($soap_do, CURLOPT_POSTFIELDS,     $soapString); 
+	curl_setopt($soap_do, CURLOPT_HTTPHEADER,     $headers); 
+
+	$result = curl_exec($soap_do);
+	$err = curl_error($soap_do);     
+}
+
+/*
+ * CERTIFICATION CHECK
+ * 
+ * This is to check the certifcation status of any given user
+ * Accepts cert name and UID, returns true or false
+ */
+
+function certCheck($cert,$uid){
+	$userInfo="";
+	$grad=0;
+	
+	global $user;
+	if ( is_numeric($uid) ){
+		$userInfo = user_load($uid);
+	}
+	
+	if ($userInfo){
+		switch ($cert) {
+			
+			// IMPORTS
+			case "HDS-LVB":
+				$grad = $userInfo->profile_lanaii_quiz;
+				$grad = gradDate($userInfo->mail, 'HDS-LVB - Lanaii Visitors Bureau');
+				break;
+			case "HDS-BIVB":
+				$grad = $userInfo->profile_bigisland_quiz;
+				$grad = gradDate($userInfo->mail, 'HDS-BIVB - Big Island Visitors Bureau');
+				break;
+			case "HDS-KVB":
+				$grad = $userInfo->profile_kauii_quiz;
+				$grad = gradDate($userInfo->mail, 'HDS-KVB - Kauii Visitors Bureau');
+				break;
+			case "HDS-MVA":
+				$grad = $userInfo->profile_mololaki_quiz;
+				$grad = gradDate($userInfo->mail, 'HDS-MVA - Mololaki Visitors Bureau');
+				break;
+			case "HDS-MVB":
+				$grad = $userInfo->profile_maui_quiz;
+				$grad = gradDate($userInfo->mail, 'HDS-MVB - Maui Visitors Bureau');
+				break;
+			case "HDS-OVB":
+				$grad = $userInfo->profile_oahu_quiz;
+				$grad = gradDate($userInfo->mail, 'HDS-OVB - Oahu Visitors Bureau');
+				break;
+			case "HDS-KEKULA":
+				$grad = hdsDate($user->mail);
+				break;
+				
+				
+			// HAWAII
+			case "Hawaii-1":
+				$grad = certCheckNid(22594,$uid);
+				break;
+			case "Hawaii-2":
+				$grad = certCheckNid(22686,$uid);
+				break;
+			case "HDS":		
+                $grad1 = certCheckNid(22594,$uid);	
+                $grad2 = certCheckNid(22686,$uid);
+                if ( ($grad1)&&($grad2) ){
+                    $grad=1;
+                }
+				break;
+			
+			// IN DEPTH			
+			case "Kauai":
+				$grad = certCheckNid(22597,$uid);
+				break;
+			case "Oahu":
+				$grad = certCheckNid(38996,$uid);
+				break;
+			case "Maui-Nui":
+				$grad = certCheckNid(38997,$uid);
+				break;
+			case "Hawaii-Island":
+				$grad = certCheckNid(38998,$uid);
+				break;
+			case "HDE":			
+				// you must pass all in depth certs to be a HDE (Hawaii Destination Expert)
+				$grad1 = certCheckNid(22597,$uid);
+				$grad2 = certCheckNid(38996,$uid);
+				$grad3 = certCheckNid(38997,$uid);
+				$grad4 = certCheckNid(38998,$uid);
+				if ( ($grad1)&&($grad2)&&($grad3)&&($grad4) ){
+					$grad=1;
+				}
+				break;
+		}	
+		if ($grad){
+			return true;
+		} else {
+			return false;
+		}
+	} else { // if no userinfo exists
+		return false;
+	}
+}
+
+/*
+ * REGISTRATION 
+ * 
+ * After a succesful user edit or add, send data to various APIs
+ */
+
+function hvcb_user($op, &$edit, &$account, $category = NULL){   
+	if ($op=="insert" || $op=="update"){
+		
+		$user = user_load($account->uid);
+		profile_load_profile($user);
+		
+		$salt="hvcbsalt";
+		$md5Txt = $account->uid . $salt;
+        $guid = md5($md5Txt);
+        
+        $hdsKEKULA = certCheck('HDS-KEKULA',$account->uid);
+        if (!$hdsKEKULA){
+            $hds = "N";
+        }
+		
+        // send data to knowlege bank
+        $xml  = "<?xml version='1.0' encoding='UTF-8'?><agents><agent><agent_id>{$account->uid}</agent_id><agent_guid>{$guid}</agent_guid><job_type>{$user->profile_job_type}</job_type><prefix>{$user->profile_title}</prefix><first_name>{$user->profile_first_name}</first_name><last_name>{$user->profile_last_name}</last_name><agency_name>{$user->profile_agency_name}</agency_name><address1>{$user->profile_address_1}</address1><address2>{$user->profile_address_2}</address2><city>{$user->profile_city}</city><state>{$user->profile_state}</state><zip>{$user->profile_zip}</zip><country>{$user->profile_country}</country><phone>{$user->profile_phone}</phone><email>{$user->mail}</email><hds>{$hds}</hds></agent></agents>";
+        $url  = "https://kb.hawaiitourismauthority.org/DBTest/receiver.jsp";
+
+        $ch = curl_init($url);
+        curl_setopt($ch, CURLOPT_MUTE, 1);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, 0);
+        curl_setopt($ch, CURLOPT_POST, 1);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: text/xml'));
+        curl_setopt($ch, CURLOPT_POSTFIELDS, "$xml");
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+        $output = curl_exec($ch);
+        curl_close($ch);    
+  
+        // send data to knowlege marketing
+		$xml="<![CDATA[<xml>
+		<Emails>
+			<EmailAddress>{$user->mail}</EmailAddress>
+			<user_USERNAME>{$user->name}</user_USERNAME>
+			<FirstName>{$user->profile_first_name}</FirstName>
+			<LastName>{$user->profile_last_name}</LastName>
+			<Title>{$user->profile_title}</Title>
+			<Address>{$user->profile_address_1}</Address>
+			<Address2>{$user->profile_address_2}</Address2>
+			<City>{$user->profile_city}</City>
+			<State>{$user->profile_state}</State>
+			<Zip>{$user->profile_zip}</Zip>
+			<Voice>{$user->profile_phone}</Voice>
+			<user_EML_PREF>?</user_EML_PREF>
+			<user_NEWS_UPDATES>{$user->profile_news_updates}</user_NEWS_UPDATES>
+			<user_AGENCYNAME>{$user->profile_agency_name}</user_AGENCYNAME>
+			<user_JOBTYPE>{$user->profile_job_type}</user_JOBTYPE>
+			<user_ACCREDITATION>{$user->profile_accreditation}</user_ACCREDITATION>
+			<user_ACCREDITATION_NUMBER>{$user->profile_accreditation_number}</user_ACCREDITATION_NUMBER>
+			<user_BEEN_TO_HAWAII>{$user->profile_have_you_been_to_hawaii}</user_BEEN_TO_HAWAII>
+			<user_HEAR_ABOUT_SITE></user_HEAR_ABOUT_SITE>
+			<user_DESTINATIONS_SELL>{$user->profile_what_destinations_do_you_sell}</user_DESTINATIONS_SELL>   
+			<user_CONSORTIA_AGENCYGROUP>{$user->profile_do_you_belong_to_a_group}</user_CONSORTIA_AGENCYGROUP>
+			<user_PREF_WHOLESALERS>{$user->profile_preferred_wholesalers}</user_PREF_WHOLESALERS>
+            <user_NICHE_CATEGORIES>{$user->profile_do_you_sell_niche_categories}</user_NICHE_CATEGORIES>
+            <user_BOOK_LARGE_GROUPS>{$user->profile_do_you_sell_to_large_groups}</user_BOOK_LARGE_GROUPS>
+            <user_AVG_CLIENTS_SENT>{$user->profile_how_many_clients_do_you_send_to_hawaii_each_year}</user_AVG_CLIENTS_SENT>
+            <user_BOOKED_REVENUE>{$user->profile_annual_revenue}</user_BOOKED_REVENUE>
+		</Emails>
+		</xml>]]>";
+
+		$url="http://webservices.ecn5.com/ListManager.asmx?op=AddSubscribers";
+		
+		$soapString='<?xml version="1.0" encoding="utf-8"?>
+		<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+		  <soap:Body>
+			<AddSubscribers xmlns="http://webservices.ecn5.com/">
+			  <ecnAccessKey>07380a30-ec29-40b0-b6d7-685d32d35eab</ecnAccessKey>
+			  <listID>248062</listID>
+			  <subscriptionType>S</subscriptionType>
+			  <formatType>HTML</formatType>
+
+			  <xmlString>'.$xml.'</xmlString>
+
+			</AddSubscribers>
+		  </soap:Body>
+		</soap:Envelope>';
+		
+		$headers = array(
+			"Content-type: text/xml;charset=\"utf-8\"",
+			"Accept: text/xml",
+			"Cache-Control: no-cache",
+			"Pragma: no-cache",
+			"SOAPAction: http://webservices.ecn5.com/AddSubscribers", 
+			"Content-length: ".strlen($soapString),
+		); 
+		
+		$soap_do = curl_init(); 
+		curl_setopt($soap_do, CURLOPT_URL,            $url );   
+		curl_setopt($soap_do, CURLOPT_CONNECTTIMEOUT, 300); 
+		curl_setopt($soap_do, CURLOPT_TIMEOUT,        300); 
+		curl_setopt($soap_do, CURLOPT_RETURNTRANSFER, true );
+		curl_setopt($soap_do, CURLOPT_SSL_VERIFYPEER, false);  
+		curl_setopt($soap_do, CURLOPT_SSL_VERIFYHOST, false); 
+		curl_setopt($soap_do, CURLOPT_POST,           true ); 
+		curl_setopt($soap_do, CURLOPT_POSTFIELDS,     $soapString); 
+		curl_setopt($soap_do, CURLOPT_HTTPHEADER,     $headers); 
+		$result = curl_exec($soap_do);
+		$err = curl_error($soap_do);  
+	}
+}

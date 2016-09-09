@@ -1,0 +1,4 @@
+name = hvcb
+description = Helper functions and API calls for: http://agents.gohawaii.com
+package = hvcb
+core = 6.x
