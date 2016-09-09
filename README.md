@@ -1,2 +1,2 @@
 # hvcb- http://agents.gohawaii.com
-custom Drupal 6 module - containers helper functions and API calls
+custom Drupal 6 module - contains helper functions and API calls
