@@ -3,7 +3,7 @@
 /* Workshop
  *
  * We allow users to enter a workshop code to bypass content
- * When user enters an access code, we pass it to URL :workhop/<code>
+ * When user enters an access code, we pass it to URL: workhop/<code>
  *
  * Callaback function does a look up to see if the access code is bound to a Course content type
  * If so, the node is loaded and user gets redirected to the course page
@@ -55,7 +55,7 @@ function workshop_code($code) {
 /*
  *  Imports
  *
- *	We are importing content types from several different sources.
+ *	We are importing content from several different sources.
  *	There is a cron running every night to fetch data and store it in csv files
  *
  *	Run cron to use the Feeds module to import this data
