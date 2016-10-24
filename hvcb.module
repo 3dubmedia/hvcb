@@ -1,57 +1,5 @@
 <?php
 
-/* Workshop
- *
- * We allow users to enter a workshop code to bypass content
- * When user enters an access code, we pass it to URL: workhop/<code>
- *
- * Callaback function does a look up to see if the access code is bound to a Course content type
- * If so, the node is loaded and user gets redirected to the course page
- * If not, the user is redirected to an error page
- * 
- */
-
-function hvcb_menu(){
-	$items['workshop/%'] = array(
-	'title' => 'workshop code',
-	'page callback' => 'workshop_code',
-	'page arguments' => array(1),
-	'access arguments' => array('access content'),
-	'type' => MENU_CALLBACK,
-	);
-	
-	return $items;
-}
-
-function workshop_code($code) { 
-    $code = htmlspecialchars($code);
-
-    $field = content_fields('field_codes');
-    $db_info = content_database_info($field);
-    $result = db_query("SELECT node.nid AS nid FROM node node  
-        LEFT JOIN content_type_course node_data_field_codes
-        ON node.vid = node_data_field_codes.vid 
-        WHERE (node.status = 1) 
-        AND (node.type in ('course')) 
-        AND (node_data_field_codes.field_codes_value LIKE '%{$code}%')");
-
-    if ($result) {
-        while($row = mysql_fetch_array($result)) {
-            $nid = $row['nid'];
-        }
-
-    }
-
-    if ($nid){
-        $node = node_load($nid);
-        $path =$node->path;
-        drupal_goto($path);
-    } else {
-        drupal_goto('workshop-error');
-    }
-    
-}
-
 /*
  *  Imports
  *
