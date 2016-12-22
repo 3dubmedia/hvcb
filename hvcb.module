@@ -15,13 +15,13 @@ function hvcb_cron() {
 	$config = array('FeedsFileFetcher'=>array('source'=>'sites/default/files/imports/' . $file));
 	$myFeed->addConfig($config);
 	while (FEEDS_BATCH_COMPLETE != $myFeed->import());
-	
+
 	$file2='activities.csv';
 	$myFeed2 = feeds_source('activities');
 	$config2 = array('FeedsFileFetcher'=>array('source'=>'sites/default/files/imports/' . $file2));
 	$myFeed2->addConfig($config2);
 	while (FEEDS_BATCH_COMPLETE != $myFeed2->import());
-}
+	}
 
 
 
@@ -230,32 +230,32 @@ function hvcb_user($op, &$edit, &$account, $category = NULL){
 		
 		$user = user_load($account->uid);
 		profile_load_profile($user);
-		
+
 		$salt="hvcbsalt";
 		$md5Txt = $account->uid . $salt;
-        $guid = md5($md5Txt);
-        
-        $hdsKEKULA = certCheck('HDS-KEKULA',$account->uid);
-        if (!$hdsKEKULA){
-            $hds = "N";
-        }
-		
-        // send data to knowlege bank
-        $xml  = "<?xml version='1.0' encoding='UTF-8'?><agents><agent><agent_id>{$account->uid}</agent_id><agent_guid>{$guid}</agent_guid><job_type>{$user->profile_job_type}</job_type><prefix>{$user->profile_title}</prefix><first_name>{$user->profile_first_name}</first_name><last_name>{$user->profile_last_name}</last_name><agency_name>{$user->profile_agency_name}</agency_name><address1>{$user->profile_address_1}</address1><address2>{$user->profile_address_2}</address2><city>{$user->profile_city}</city><state>{$user->profile_state}</state><zip>{$user->profile_zip}</zip><country>{$user->profile_country}</country><phone>{$user->profile_phone}</phone><email>{$user->mail}</email><hds>{$hds}</hds></agent></agents>";
-        $url  = "https://kb.hawaiitourismauthority.org/DBTest/receiver.jsp";
+		$guid = md5($md5Txt);
 
-        $ch = curl_init($url);
-        curl_setopt($ch, CURLOPT_MUTE, 1);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, 0);
-        curl_setopt($ch, CURLOPT_POST, 1);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: text/xml'));
-        curl_setopt($ch, CURLOPT_POSTFIELDS, "$xml");
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-        $output = curl_exec($ch);
-        curl_close($ch);    
-  
-        // send data to knowlege marketing
+		$hdsKEKULA = certCheck('HDS-KEKULA',$account->uid);
+		if (!$hdsKEKULA){
+		    $hds = "N";
+		}
+
+		// send data to knowlege bank
+		$xml  = "<?xml version='1.0' encoding='UTF-8'?><agents><agent><agent_id>{$account->uid}</agent_id><agent_guid>{$guid}</agent_guid><job_type>{$user->profile_job_type}</job_type><prefix>{$user->profile_title}</prefix><first_name>{$user->profile_first_name}</first_name><last_name>{$user->profile_last_name}</last_name><agency_name>{$user->profile_agency_name}</agency_name><address1>{$user->profile_address_1}</address1><address2>{$user->profile_address_2}</address2><city>{$user->profile_city}</city><state>{$user->profile_state}</state><zip>{$user->profile_zip}</zip><country>{$user->profile_country}</country><phone>{$user->profile_phone}</phone><email>{$user->mail}</email><hds>{$hds}</hds></agent></agents>";
+		$url  = "https://kb.hawaiitourismauthority.org/DBTest/receiver.jsp";
+
+		$ch = curl_init($url);
+		curl_setopt($ch, CURLOPT_MUTE, 1);
+		curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+		curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, 0);
+		curl_setopt($ch, CURLOPT_POST, 1);
+		curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: text/xml'));
+		curl_setopt($ch, CURLOPT_POSTFIELDS, "$xml");
+		curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+		$output = curl_exec($ch);
+		curl_close($ch);    
+
+		// send data to knowlege marketing
 		$xml="<![CDATA[<xml>
 		<Emails>
 			<EmailAddress>{$user->mail}</EmailAddress>
