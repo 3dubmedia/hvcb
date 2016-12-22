@@ -21,9 +21,7 @@ function hvcb_cron() {
 	$config2 = array('FeedsFileFetcher'=>array('source'=>'sites/default/files/imports/' . $file2));
 	$myFeed2->addConfig($config2);
 	while (FEEDS_BATCH_COMPLETE != $myFeed2->import());
-	}
-
-
+}
 
 /*
  * QUIZ FUNCTION - gradDate
